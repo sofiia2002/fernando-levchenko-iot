@@ -1,0 +1,29 @@
+{
+  "name": "aggregator-mqtt-broker",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/pubsub": "^3.2.0",
+    "aedes": "^0.48.0",
+    "axios": "^1.1.2",
+    "body-parser": "^1.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.1",
+    "http": "^0.0.1-security",
+    "mqtt": "^4.3.7",
+    "net": "^1.0.2",
+    "node-fetch": "^3.2.10",
+    "ronin-mocks": "^0.1.11",
+    "ronin-server": "^0.1.3",
+    "ttn": "^2.3.3"
+  },
+  "description": ""
+}
