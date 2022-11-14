@@ -109,7 +109,7 @@ typedef enum cond_sel_type
 } cond_sel_type;
 
 typedef struct agg_condition {
-	uint8_t value;
+	uint16_t value;
 	param_type parameter;
 	agg_type condition;
 } agg_condition;
@@ -476,6 +476,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 	nx_json *condVal;
 	nx_json *condExp;
 	nx_json *condPar;
+	uint8_t parameter;
 	uint8_t epDur;
 	uint8_t status;
 	uint8_t i = 0;
@@ -542,12 +543,12 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     		  for (i = 0; i < rulesArray->children.length; i++) {
     			  const nx_json* item=nx_json_item(rulesArray, i);
-    			  const uint8_t parameter = (uint8_t)atoi(nx_json_item(item, "par") -> text_value);
+    			  parameter = (uint8_t)atoi(nx_json_get(item, "par") -> text_value);
 
     			  switch (parameter)
     			  {
     			  	  case TEMPERATURE:
-    	    			  APP_LOG(TS_ON, VLEVEL_L, "ENABLING PARAMETER: TEMERATURE\r\n");
+    	    			  APP_LOG(TS_ON, VLEVEL_L, "ENABLING PARAMETER: TEMPERATURE\r\n");
     	    			  TempDataOn = 1;
 
     	    			  temperature_storage.AggMaxOn = 0;
@@ -556,6 +557,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  temperature_storage.AggAvgOn = 0;
     	    			  temperature_storage.AggSumOn = 0;
     	    			  temperature_storage.AggSqSumOn = 0;
+    	    			  temperature_storage.condSize = 0;
+    	    			  temperature_storage.measurementId = 0;
 
     	    	          aggPar = nx_json_get(item, "agg");
 
@@ -595,7 +598,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  UTIL_TIMER_Stop(&TxTimer);
 
-    	    			  UTIL_TIMER_Create(&TxTemperatureMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnTxTimerEvent, NULL);
+    	    			  UTIL_TIMER_Create(&TxTemperatureMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnMeasureTemperatureTimerEvent, NULL);
     	    			  UTIL_TIMER_SetPeriod(&TxTemperatureMeasureTimer, epDur*1000);
     	    			  UTIL_TIMER_Start(&TxTemperatureMeasureTimer);
 
@@ -607,10 +610,10 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    				condSel = nx_json_get(nx_json_get(item, "cond"), "chain");
     	    				condArr = nx_json_get(nx_json_get(item, "cond"), "agg");
 
-    	    				if (strcmp((char*)(condSel->text_value), "AND") == 0) {
+    	    				if ((uint8_t)atoi(condSel->text_value) == AND) {
     	    			    	temperature_storage.condSel = AND;
     	    				}
-    	    				if (strcmp((char*)(condSel->text_value), "OR") == 0) {
+    	    				if ((uint8_t)atoi(condSel->text_value) == OR) {
     	    				    temperature_storage.condSel = OR;
     	    				}
 
@@ -622,22 +625,27 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			    	condExp = nx_json_get(condItem, "code");
     	    			    	condPar = nx_json_get(condItem, "par");
 
-    	    			    	temperature_storage.aggConditions[j].value = (uint8_t)atoi(condVal->text_value);
+    	    			    	temperature_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
 
     	    			    	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", temperature_storage.aggConditions[j].value);
 
-    	    			    	if (strcmp((char*)(condPar->text_value), "pressure") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
-    	    			    		temperature_storage.aggConditions[j].parameter = PRESSURE;
-    	    			    	}
-    	    			    	else if (strcmp((char*)(condPar->text_value), "temperature") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
-    	    			    		temperature_storage.aggConditions[j].parameter = TEMPERATURE;
-    	    			    	}
-    	    			    	else if (strcmp((char*)(condPar->text_value), "humidity") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
-    	    			    		temperature_storage.aggConditions[j].parameter = HUMIDITY;
-    	    			    	}
+    	    			      	switch ((uint8_t)atoi(condPar->text_value))
+    	    			      	{
+    	    			      		case TEMPERATURE:
+    	    			      	    	APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
+    	    			      	    	temperature_storage.aggConditions[j].parameter = TEMPERATURE;
+    	    			      	    	break;
+    	    			      	    case PRESSURE:
+    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
+    	    			      	      temperature_storage.aggConditions[j].parameter = PRESSURE;
+    	    			      	        break;
+    	    			      	    case HUMIDITY:
+    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
+    	    			      	      temperature_storage.aggConditions[j].parameter = HUMIDITY;
+    	    			      	        break;
+    	    			      	    default:
+    	    			      	       break;
+    	    			      	}
 
     	    			    	if (strcmp((char*)(condExp->text_value), "G") == 0) {
     	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
@@ -655,9 +663,9 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
     	    			    		temperature_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
     	    			    	}
+    	    			    	temperature_storage.condSize++;
     	    			    }
 
-	    			    	temperature_storage.condSize = j+1;
     	    			  }
 
     	    			  // END CONDITION
@@ -675,12 +683,14 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  pressure_storage.AggAvgOn = 0;
     	    			  pressure_storage.AggSumOn = 0;
     	    			  pressure_storage.AggSqSumOn = 0;
+    	    			  pressure_storage.condSize = 0;
+    	    			  pressure_storage.measurementId = 0;
 
     	    			  aggPar = nx_json_get(item, "agg");
 
     	    			  // START AGGREGATOR
-    	    			  for (i = 0; i < aggPar->children.length; i++) {
-    	    			  	const nx_json* item=nx_json_item(aggPar, i);
+    	    			  for (j = 0; j < aggPar->children.length; j++) {
+    	    			  	const nx_json* item=nx_json_item(aggPar, j);
     	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING AGGREGATOR: %s\r\n", item->text_value);
 
     	    			    if (strcmp((char*)(item->text_value), "MAX") == 0){
@@ -714,7 +724,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  UTIL_TIMER_Stop(&TxTimer);
 
-    	    			  UTIL_TIMER_Create(&TxPressureMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnTxTimerEvent, NULL);
+    	    			  UTIL_TIMER_Create(&TxPressureMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnMeasurePressureTimerEvent, NULL);
     	    			  UTIL_TIMER_SetPeriod(&TxPressureMeasureTimer, epDur*1000);
     	    			  UTIL_TIMER_Start(&TxPressureMeasureTimer);
 
@@ -741,21 +751,26 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			      	condExp = nx_json_get(condItem, "code");
     	    			      	condPar = nx_json_get(condItem, "par");
 
-    	    			      	pressure_storage.aggConditions[j].value = (uint8_t)atoi(condVal->text_value);
+    	    			      	pressure_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
 
     	    			      	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", pressure_storage.aggConditions[j].value);
 
-    	    			      	if (strcmp((char*)(condPar->text_value), "pressure") == 0) {
-    	    			      		APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
-    	    			      	    pressure_storage.aggConditions[j].parameter = PRESSURE;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condPar->text_value), "temperature") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
-    	    			      	    pressure_storage.aggConditions[j].parameter = TEMPERATURE;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condPar->text_value), "humidity") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
-    	    			      	    pressure_storage.aggConditions[j].parameter = HUMIDITY;
+    	    			      	switch ((uint8_t)atoi(condPar->text_value))
+    	    			      	{
+    	    			      		case TEMPERATURE:
+    	    			      	    	APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
+    	    			      	    	pressure_storage.aggConditions[j].parameter = TEMPERATURE;
+    	    			      	    	break;
+    	    			      	    case PRESSURE:
+    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
+    	    			      	        pressure_storage.aggConditions[j].parameter = PRESSURE;
+    	    			      	        break;
+    	    			      	    case HUMIDITY:
+    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
+    	    			      	        pressure_storage.aggConditions[j].parameter = HUMIDITY;
+    	    			      	        break;
+    	    			      	    default:
+    	    			      	       break;
     	    			      	}
 
     	    			      	if (strcmp((char*)(condExp->text_value), "G") == 0) {
@@ -774,9 +789,11 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
     	    			      	    pressure_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
     	    			      	 }
+
+   	    			      	     pressure_storage.condSize++;
+
     	    			      }
 
-	    			      	 pressure_storage.condSize = j+1;
     	    			  }
 
     	    			  // END CONDITION
@@ -793,12 +810,14 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  humidity_storage.AggAvgOn = 0;
     	    			  humidity_storage.AggSumOn = 0;
     	    			  humidity_storage.AggSqSumOn = 0;
+    	    			  humidity_storage.condSize = 0;
+    	    			  humidity_storage.measurementId = 0;
 
     	    			  aggPar = nx_json_get(item, "agg");
 
     	    			  // START AGGREGATOR
-    	    			  for (i = 0; i < aggPar->children.length; i++) {
-    	    			  	const nx_json* item=nx_json_item(aggPar, i);
+    	    			  for (j = 0; j < aggPar->children.length; j++) {
+    	    			  	const nx_json* item=nx_json_item(aggPar, j);
     	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING AGGREGATOR: %s\r\n", item->text_value);
 
     	    			    if (strcmp((char*)(item->text_value), "MAX") == 0){
@@ -832,7 +851,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  UTIL_TIMER_Stop(&TxTimer);
 
-    	    			  UTIL_TIMER_Create(&TxHumidityMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnTxTimerEvent, NULL);
+    	    			  UTIL_TIMER_Create(&TxHumidityMeasureTimer,  0xFFFFFFFFU, UTIL_TIMER_ONESHOT, OnMeasureHumidityTimerEvent, NULL);
     	    			  UTIL_TIMER_SetPeriod(&TxHumidityMeasureTimer, epDur*1000);
     	    			  UTIL_TIMER_Start(&TxHumidityMeasureTimer);
 
@@ -859,21 +878,26 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			      	condExp = nx_json_get(condItem, "code");
     	    			      	condPar = nx_json_get(condItem, "par");
 
-    	    			      	humidity_storage.aggConditions[j].value = (uint8_t)atoi(condVal->text_value);
+    	    			      	humidity_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
 
     	    			      	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", humidity_storage.aggConditions[j].value);
 
-    	    			      	if (strcmp((char*)(condPar->text_value), "pressure") == 0) {
-    	    			      		APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
-    	    			      		humidity_storage.aggConditions[j].parameter = PRESSURE;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condPar->text_value), "temperature") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
-    	    			      	    humidity_storage.aggConditions[j].parameter = TEMPERATURE;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condPar->text_value), "humidity") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
-    	    			      	    humidity_storage.aggConditions[j].parameter = HUMIDITY;
+    	    			      	switch ((uint8_t)atoi(condPar->text_value))
+    	    			      	{
+    	    			      		case TEMPERATURE:
+    	    			      			APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
+    	    			      			humidity_storage.aggConditions[j].parameter = TEMPERATURE;
+    	    			      			break;
+    	    			      		case PRESSURE:
+        	    			      		APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
+        	    			      		humidity_storage.aggConditions[j].parameter = PRESSURE;
+        	    			      		break;
+    	    			      		case HUMIDITY:
+        	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
+        	    			      	    humidity_storage.aggConditions[j].parameter = HUMIDITY;
+        	    			      	    break;
+        	    			      	default:
+        	    			      		break;
     	    			      	}
 
     	    			      	if (strcmp((char*)(condExp->text_value), "G") == 0) {
@@ -883,18 +907,19 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			      	else if (strcmp((char*)(condExp->text_value), "GE") == 0) {
     	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
     	    			      	    humidity_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
-    	    			      	 }
-    	    			      	 else if (strcmp((char*)(condExp->text_value), "L") == 0) {
+    	    			      	}
+    	    			      	else if (strcmp((char*)(condExp->text_value), "L") == 0) {
     	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
     	    			      	    humidity_storage.aggConditions[j].condition = LESS;
-    	    			      	 }
-    	    			      	 else if (strcmp((char*)(condExp->text_value), "LE") == 0) {
+    	    			      	}
+    	    			      	else if (strcmp((char*)(condExp->text_value), "LE") == 0) {
     	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
     	    			      	    humidity_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
-    	    			      	 }
+    	    			      	}
+
+        	    			    humidity_storage.condSize++;
     	    			      }
 
-    	    			    humidity_storage.condSize = j+1;
     	    			  }
 
     	    			  humidity_storage.AggStateOn = 1;
@@ -905,11 +930,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     		  }
 
     		  // END CONDITION
-
-      	      i = 0;
     	      status = 1;
 
-        	  APP_LOG(TS_ON, VLEVEL_L, "AGGREGATION STATE: %d\r\n", AggStateOn);
       	      APP_LOG(TS_ON, VLEVEL_L, "DATA PARSED CORRECTLY\r\n", (AppLedStateOn));
 
     	      nx_json_free(rulesArray);
@@ -944,7 +966,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 static void CollectMeasurements(void)
 {
 	uint16_t pressure = 0;
-	int16_t temperature = 0;
+	uint16_t temperature = 0;
 	uint16_t humidity = 0;
 
 	sensor_t sensor_data;
@@ -954,10 +976,20 @@ static void CollectMeasurements(void)
 	int8_t collectPressure = 0;
 	int8_t collectHumidity = 0;
 
-	if (AggStateOn == 1)
+	APP_LOG(TS_ON, VLEVEL_L, "pressure state: %d\r\n", (PressDataOn));
+	APP_LOG(TS_ON, VLEVEL_L, "temperature state: %d\r\n", (TempDataOn));
+	APP_LOG(TS_ON, VLEVEL_L, "humidity state: %d\r\n", (HumDataOn));
+
+	if (HumDataOn == 1 || TempDataOn == 1 || PressDataOn == 1)
 	{
 		APP_LOG(TS_OFF, VLEVEL_L, "\r\n###### ============ COLLECTING MEASUREMENS ============\r\n");
 		EnvSensors_Read(&sensor_data);
+		temperature = (SYS_GetTemperatureLevel() >> 8);
+		pressure    = (uint16_t)(sensor_data.pressure * 100 / 10);  /* in hPa / 10 */
+		humidity    = (uint16_t)(sensor_data.humidity * 10);            /* in %*10     */
+		APP_LOG(TS_ON, VLEVEL_L, "pressure before condition: %d\r\n", (pressure));
+		APP_LOG(TS_ON, VLEVEL_L, "temperature before condition: %d\r\n", (temperature));
+		APP_LOG(TS_ON, VLEVEL_L, "humidity before condition: %d\r\n", (humidity));
 
 		for (i = 0; i < temperature_storage.condSize; i++) {
 			switch (temperature_storage.aggConditions[i].condition){
@@ -968,7 +1000,7 @@ static void CollectMeasurements(void)
 						}
 					}
 					else if (temperature_storage.aggConditions[i].parameter == PRESSURE) {
-						if (pressure > temperature_storage.aggConditions[i].value) {
+						if (temperature  > temperature_storage.aggConditions[i].value) {
 							collectTemperature++;
 						}
 					}
@@ -1037,68 +1069,68 @@ static void CollectMeasurements(void)
 				case GREATER:
 					if (pressure_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature > pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure > pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity > pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					break;
 				case GREATER_THAN_EQUAL:
 					if (pressure_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature >= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure >= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity >= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					break;
 				case LESS:
 					if (pressure_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature < pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure < pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity < pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					break;
 				case LESS_THAN_EQUAL:
 					if (pressure_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature <= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure <= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					else if (pressure_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity <= pressure_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectPressure++;
 						}
 					}
 					break;
@@ -1110,82 +1142,81 @@ static void CollectMeasurements(void)
 				case GREATER:
 					if (humidity_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature > humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure > humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity > humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					break;
 				case GREATER_THAN_EQUAL:
 					if (humidity_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature >= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure >= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity >= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					break;
 				case LESS:
 					if (humidity_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature < humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure < humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity < humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					break;
 				case LESS_THAN_EQUAL:
 					if (humidity_storage.aggConditions[i].parameter == TEMPERATURE) {
 						if (temperature <= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == PRESSURE) {
 						if (pressure <= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					else if (humidity_storage.aggConditions[i].parameter == HUMIDITY) {
 						if (humidity <= humidity_storage.aggConditions[i].value) {
-							collectTemperature++;
+							collectHumidity++;
 						}
 					}
 					break;
 			}
 		}
 
-		if (TempDataOn == 1 && ((temperature_storage.condSel == AND && collectTemperature == temperature_storage.condSize) || (temperature_storage.condSel == OR && collectTemperature > 0)) )
+		if (TempDataOn == 1 && ((temperature_storage.condSel == AND && collectTemperature == temperature_storage.condSize) || (temperature_storage.condSel == OR && collectTemperature > 0) || (temperature_storage.condSize == 0)) )
 		{
-			temperature = (SYS_GetTemperatureLevel() >> 8);
 			APP_LOG(TS_ON, VLEVEL_L, "temperature: %d\r\n", (temperature));
-			temperature_storage.collectedData.count = temperature_storage.collectedData.count + 1;
+			temperature_storage.collectedData.count = (temperature_storage.collectedData.count) + 1;
 			temperature_storage.collectedData.sum = temperature_storage.collectedData.sum + temperature;
 			temperature_storage.collectedData.sqSum = temperature_storage.collectedData.sqSum + (temperature * temperature);
-			if (temperature_storage.collectedData.min > temperature)
+			if (temperature_storage.collectedData.min > temperature || temperature_storage.collectedData.sum == temperature)
 			{
 				temperature_storage.collectedData.min = temperature;
 			}
@@ -1195,14 +1226,13 @@ static void CollectMeasurements(void)
 			}
 		}
 
-		if (PressDataOn == 1 && ((pressure_storage.condSel == AND && collectPressure == pressure_storage.condSize) || (pressure_storage.condSel == OR && collectPressure > 0)))
+		if (PressDataOn == 1 && ((pressure_storage.condSel == AND && collectPressure == pressure_storage.condSize) || (pressure_storage.condSel == OR && collectPressure > 0) || (pressure_storage.condSize == 0)))
 		{
-			pressure    = (uint16_t)(sensor_data.pressure * 100 / 10);  /* in hPa / 10 */
 			APP_LOG(TS_ON, VLEVEL_L, "pressure: %d\r\n", (pressure));
 			pressure_storage.collectedData.count = (pressure_storage.collectedData.count) + 1;
 			pressure_storage.collectedData.sum = pressure_storage.collectedData.sum + pressure;
 			pressure_storage.collectedData.sqSum = pressure_storage.collectedData.sqSum + (pressure * pressure);
-			if (pressure_storage.collectedData.min > pressure)
+			if (pressure_storage.collectedData.min > pressure || pressure_storage.collectedData.sum == pressure)
 			{
 				pressure_storage.collectedData.min = pressure;
 			}
@@ -1212,14 +1242,13 @@ static void CollectMeasurements(void)
 			}
 		}
 
-		if (HumDataOn == 1 && ((humidity_storage.condSel == AND && collectHumidity == humidity_storage.condSize) || (humidity_storage.condSel == OR && collectHumidity > 0)))
+		if (HumDataOn == 1 && ((humidity_storage.condSel == AND && collectHumidity == humidity_storage.condSize) || (humidity_storage.condSel == OR && collectHumidity > 0)  || (humidity_storage.condSize == 0)))
 		{
-			humidity    = (uint16_t)(sensor_data.humidity * 10);            /* in %*10     */
 			APP_LOG(TS_ON, VLEVEL_L, "humidity: %d\r\n", (humidity));
 			humidity_storage.collectedData.count = humidity_storage.collectedData.count + 1;
 			humidity_storage.collectedData.sum = humidity_storage.collectedData.sum + humidity;
 			humidity_storage.collectedData.sqSum = humidity_storage.collectedData.sqSum + (humidity * humidity);
-			if (humidity_storage.collectedData.min > humidity)
+			if (humidity_storage.collectedData.min > humidity || humidity_storage.collectedData.sum == humidity)
 			{
 				humidity_storage.collectedData.min = humidity;
 			}
@@ -1235,7 +1264,6 @@ static void CollectMeasurements(void)
 
 static void SendTemperatureMeasurements(void)
 {
-	int16_t temperature = 0;
 	int16_t temperature_max = 0;
 	int16_t temperature_min = 0;
 	int16_t temperature_avg = 0;
@@ -1347,6 +1375,8 @@ static void SendTemperatureMeasurements(void)
 		}
 
 		// CLEAN UP
+
+		temperature_storage.measurementId++;
 		temperature_storage.collectedData.max = 0;
 		temperature_storage.collectedData.min = 0;
 		temperature_storage.collectedData.sum = 0;
@@ -1476,6 +1506,7 @@ static void SendPressureMeasurements(void)
 
 		// CLEAN UP
 
+		pressure_storage.measurementId++;
 		pressure_storage.collectedData.max = 0;
 		pressure_storage.collectedData.min = 0;
 		pressure_storage.collectedData.sum = 0;
@@ -1604,6 +1635,7 @@ static void SendHumidityMeasurements(void)
 
 		// CLEAN UP
 
+		humidity_storage.measurementId++;
 		humidity_storage.collectedData.max = 0;
 		humidity_storage.collectedData.min = 0;
 		humidity_storage.collectedData.sum = 0;
@@ -1694,26 +1726,26 @@ static void OnMeasureDataTimerEvent(void *context)
 
 static void OnMeasureTemperatureTimerEvent(void *context)
 {
-	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_CollectMeasurmentsEvent), CFG_SEQ_Prio_0);
+	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_LoRaSendOnTemperatureTimerEvent), CFG_SEQ_Prio_0);
 
 	/*Wait for next tx slot*/
-	UTIL_TIMER_Start(&DataMeasureTimer);
+	UTIL_TIMER_Start(&TxTemperatureMeasureTimer);
 }
 
 static void OnMeasurePressureTimerEvent(void *context)
 {
-	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_CollectMeasurmentsEvent), CFG_SEQ_Prio_0);
+	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_LoRaSendOnPressureTimerEvent), CFG_SEQ_Prio_0);
 
 	/*Wait for next tx slot*/
-	UTIL_TIMER_Start(&DataMeasureTimer);
+	UTIL_TIMER_Start(&TxPressureMeasureTimer);
 }
 
 static void OnMeasureHumidityTimerEvent(void *context)
 {
-	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_CollectMeasurmentsEvent), CFG_SEQ_Prio_0);
+	UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_LoRaSendOnHumidityTimerEvent), CFG_SEQ_Prio_0);
 
 	/*Wait for next tx slot*/
-	UTIL_TIMER_Start(&DataMeasureTimer);
+	UTIL_TIMER_Start(&TxHumidityMeasureTimer);
 }
 
 static void OnTxTimerEvent(void *context)
