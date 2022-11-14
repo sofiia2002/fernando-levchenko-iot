@@ -33,67 +33,69 @@ router.post("/post-uplink-message", async (req, res) => {
   const data = req.body.uplink_message.decoded_payload;
   console.log(data);
 
-  var sendData = {};
+  if (data) {
+    var sendData = {};
 
-  console.log(data.AggState);
+    console.log(data.AggState);
 
-  if (data.measurementId === 0) {
-    processed_mess_ids = [];
-    saved_messages = [];
-  }
+    if (data.measurementId === 0) {
+      processed_mess_ids = [];
+      saved_messages = [];
+    }
 
-  if (data.AggState === 1) {
-    console.log("#1");
-    saved_messages.push(data);
-    console.log("processed_mess_ids", JSON.stringify(processed_mess_ids));
-    console.log("saved_messages", JSON.stringify(saved_messages));
+    if (data.AggState === 1) {
+      console.log("#1");
+      saved_messages.push(data);
+      console.log("processed_mess_ids", JSON.stringify(processed_mess_ids));
+      console.log("saved_messages", JSON.stringify(saved_messages));
 
-    if (
-      data.measurementId - 1 >
-      (processed_mess_ids.length ? Math.max(...processed_mess_ids) : -1)
-    ) {
-      console.log("#2");
-      const exclusive_mess_for_parameter_and_id = saved_messages.filter(
-        (mess) =>
-          mess.measurementId ===
-          (processed_mess_ids.length ? Math.max(...processed_mess_ids) : 0)
-      );
-      console.log(
-        "exclusive_mess_for_parameter_and_id",
-        JSON.stringify(exclusive_mess_for_parameter_and_id)
-      );
-
-      if (exclusive_mess_for_parameter_and_id.length > 0) {
-        console.log("#3");
-        sendData.data = helpers.process_messages(
-          num_of_devices,
-          active_aggregators,
-          exclusive_mess_for_parameter_and_id[0].parameter,
-          exclusive_mess_for_parameter_and_id
+      if (
+        data.measurementId - 1 >
+        (processed_mess_ids.length ? Math.max(...processed_mess_ids) : -1)
+      ) {
+        console.log("#2");
+        const exclusive_mess_for_parameter_and_id = saved_messages.filter(
+          (mess) =>
+            mess.measurementId ===
+            (processed_mess_ids.length ? Math.max(...processed_mess_ids) : 0)
+        );
+        console.log(
+          "exclusive_mess_for_parameter_and_id",
+          JSON.stringify(exclusive_mess_for_parameter_and_id)
         );
 
-        sendData.parameter = exclusive_mess_for_parameter_and_id[0].parameter;
-
-        processed_mess_ids.push(
-          exclusive_mess_for_parameter_and_id[0].measurementId
-        );
-
-        console.log("sendData", JSON.stringify(sendData));
-
-        const s = JSON.stringify(sendData);
-
-        try {
-          await axios.post(
-            "http://localhost:1880/send-agg-result",
-            Buffer.from(s).toString("base64"),
-            {
-              headers: {
-                "Content-Type": "text/plain",
-              },
-            }
+        if (exclusive_mess_for_parameter_and_id.length > 0) {
+          console.log("#3");
+          sendData.data = helpers.process_messages(
+            num_of_devices,
+            active_aggregators,
+            exclusive_mess_for_parameter_and_id[0].parameter,
+            exclusive_mess_for_parameter_and_id
           );
-        } catch (err) {
-          console.log(err);
+
+          sendData.parameter = exclusive_mess_for_parameter_and_id[0].parameter;
+
+          processed_mess_ids.push(
+            exclusive_mess_for_parameter_and_id[0].measurementId
+          );
+
+          console.log("sendData", JSON.stringify(sendData));
+
+          const s = JSON.stringify(sendData);
+
+          try {
+            await axios.post(
+              "http://localhost:1880/send-agg-result",
+              Buffer.from(s).toString("base64"),
+              {
+                headers: {
+                  "Content-Type": "text/plain",
+                },
+              }
+            );
+          } catch (err) {
+            console.log(err);
+          }
         }
       }
     }
