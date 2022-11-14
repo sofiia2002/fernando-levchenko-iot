@@ -54,12 +54,12 @@ const process_avg = (messages) => {
 
 const process_max = (messages) => {
   const min_values = messages.map((value) => value.max);
-  return Math.max(min_values);
+  return Math.max(...min_values);
 };
 
 const process_min = (messages) => {
   const min_values = messages.map((value) => value.min);
-  return Math.min(min_values);
+  return Math.min(...min_values);
 };
 
 const process_count = (messages) => {

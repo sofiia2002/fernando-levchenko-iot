@@ -13,7 +13,7 @@ const num_of_devices = 1;
 
 var active_aggregators = {};
 var saved_messages = [];
-var processed_mess_ids = [];
+var processed_mess_ids = [-1];
 
 var corsOptions = {
   allowedHeaders: ["Content-Type"],
@@ -39,7 +39,7 @@ router.post("/post-uplink-message", async (req, res) => {
     console.log(data.AggState);
 
     if (data.measurementId === 0) {
-      processed_mess_ids = [];
+      processed_mess_ids = [-1];
       saved_messages = [];
     }
 
@@ -49,15 +49,10 @@ router.post("/post-uplink-message", async (req, res) => {
       console.log("processed_mess_ids", JSON.stringify(processed_mess_ids));
       console.log("saved_messages", JSON.stringify(saved_messages));
 
-      if (
-        data.measurementId - 1 >
-        (processed_mess_ids.length ? Math.max(...processed_mess_ids) : -1)
-      ) {
+      if (data.measurementId - 1 > Math.max(...processed_mess_ids)) {
         console.log("#2");
         const exclusive_mess_for_parameter_and_id = saved_messages.filter(
-          (mess) =>
-            mess.measurementId ===
-            (processed_mess_ids.length ? Math.max(...processed_mess_ids) : 0)
+          (mess) => mess.measurementId === Math.max(...processed_mess_ids) + 1
         );
         console.log(
           "exclusive_mess_for_parameter_and_id",
@@ -108,7 +103,7 @@ router.post("/add-rule", async (req, res) => {
 
   active_aggregators = {};
   saved_messages = [];
-  processed_mess_ids = [];
+  processed_mess_ids = [-1];
 
   req.body.forEach((element, index) => {
     newData.push({});
