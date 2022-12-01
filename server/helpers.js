@@ -74,4 +74,59 @@ const process_sguareSum = (messages) => {
     .reduce((sum, value) => sum + value, 0);
 };
 
-module.exports = { process_messages };
+const convert_message = (message) => {
+  let i = 0;
+  const bytesResult = Buffer.alloc(103);
+
+  const num_of_par = message.length;
+  bytesResult[i++] = num_of_par & 0xff; //(rgb >> 8) & 0xFF;
+  for (const par_mess of message) {
+    const parameter = par_mess.par;
+    bytesResult[i++] = parameter & 0xff;
+
+    if (par_mess.agg.includes("MAX")) bytesResult[i++] = 1 & 0xff;
+    else bytesResult[i++] = 0 & 0xff;
+    if (par_mess.agg.includes("MIN")) bytesResult[i++] = 1 & 0xff;
+    else bytesResult[i++] = 0 & 0xff;
+    if (par_mess.agg.includes("COUNT")) bytesResult[i++] = 1 & 0xff;
+    else bytesResult[i++] = 0 & 0xff;
+    if (par_mess.agg.includes("SUM")) bytesResult[i++] = 1 & 0xff;
+    else bytesResult[i++] = 0 & 0xff;
+    if (par_mess.agg.includes("SQSUM")) bytesResult[i++] = 1 & 0xff;
+    else bytesResult[i++] = 0 & 0xff;
+
+    const ep_duration = par_mess.epDur;
+    bytesResult[i++] = (ep_duration >> 8) & 0xff;
+    bytesResult[i++] = ep_duration & 0xff;
+
+    const condition_chain = par_mess.cond.chain || 0;
+    bytesResult[i++] = condition_chain & 0xff;
+
+    const num_of_conditons = par_mess.cond.agg.length;
+    bytesResult[i++] = num_of_conditons & 0xff;
+
+    if (num_of_conditons > 0) {
+      for (const single_condition of par_mess.cond.agg) {
+        const single_cond_par = single_condition.par;
+        bytesResult[i++] = single_cond_par & 0xff;
+
+        const single_cond_type =
+          single_condition.code === "G"
+            ? 0
+            : single_condition.code === "GE"
+            ? 1
+            : single_condition.code === "L"
+            ? 2
+            : 3;
+        bytesResult[i++] = single_cond_type & 0xff;
+
+        const single_cond_val = single_condition.val;
+        bytesResult[i++] = (single_cond_val >> 8) & 0xff;
+        bytesResult[i++] = single_cond_val & 0xff;
+      }
+    }
+  }
+  return bytesResult;
+};
+
+module.exports = { process_messages, convert_message };

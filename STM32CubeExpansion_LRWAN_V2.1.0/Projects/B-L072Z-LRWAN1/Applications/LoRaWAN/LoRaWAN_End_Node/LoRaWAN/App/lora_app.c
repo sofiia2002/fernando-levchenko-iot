@@ -469,16 +469,10 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     APP_LOG(TS_ON, VLEVEL_L, "PORT:%d\r\n", appData->Port);
 
 	uint8_t *buffer;
-	nx_json *rulesArray;
-	nx_json *aggPar;
-	nx_json *condArr;
-	nx_json *condSel;
-	nx_json *condVal;
-	nx_json *condExp;
-	nx_json *condPar;
-	uint8_t parameter;
+	uint8_t parameters_number;
 	uint8_t epDur;
 	uint8_t status;
+	uint8_t l = 0;
 	uint8_t i = 0;
 	uint8_t j = 0;
 	UTIL_TIMER_Time_t nextTxIn = 0;
@@ -533,19 +527,17 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	  // Processing received data
     	  buffer = appData->Buffer;
-    	  rulesArray=nx_json_parse(buffer, 0);
 
     	  PressDataOn = 0;
     	  TempDataOn = 0;
     	  HumDataOn = 0;
+    	  l = 0;
 
-    	  if (rulesArray) {
+    	  parameters_number = buffer[l++];
 
-    		  for (i = 0; i < rulesArray->children.length; i++) {
-    			  const nx_json* item=nx_json_item(rulesArray, i);
-    			  parameter = (uint8_t)atoi(nx_json_get(item, "par") -> text_value);
-
-    			  switch (parameter)
+    	  if (parameters_number != 0) {
+    		  for (i = 0; i < parameters_number; i++) {
+    			  switch (buffer[l++])
     			  {
     			  	  case TEMPERATURE:
     	    			  APP_LOG(TS_ON, VLEVEL_L, "ENABLING PARAMETER: TEMPERATURE\r\n");
@@ -560,38 +552,29 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  temperature_storage.condSize = 0;
     	    			  temperature_storage.measurementId = 0;
 
-    	    	          aggPar = nx_json_get(item, "agg");
-
     	    			  // START AGGREGATOR
-    	    			  for (j = 0; j < aggPar->children.length; j++) {
-    	    				  const nx_json* item=nx_json_item(aggPar, j);
-    	    			      APP_LOG(TS_ON, VLEVEL_L, "ENABLING AGGREGATOR: %s\r\n", item->text_value);
 
-    	    			      if (strcmp((char*)(item->text_value), "MAX") == 0){
-    	    			    	  temperature_storage.AggMaxOn = 1;
-    	    			      }
-    	    			      if (strcmp((char*)(item->text_value), "MIN") == 0){
-    	    			    	  temperature_storage.AggMinOn = 1;
-    	    			      }
-    	    			      if (strcmp((char*)(item->text_value), "COUNT") == 0) {
-    	    			    	  temperature_storage.AggCountOn = 1;
-    	    			      }
-    	    			      if (strcmp((char*)(item->text_value), "AVG") == 0) {
-    	    			    	  temperature_storage.AggAvgOn = 1;
-    	    			      }
-    	    			      if (strcmp((char*)(item->text_value), "SUM") == 0) {
-    	    			    	  temperature_storage.AggSumOn = 1;
-    	    			      }
-    	    			      if (strcmp((char*)(item->text_value), "SQSUM") == 0) {
-    	    			    	  temperature_storage.AggSqSumOn = 1;
-    	    			      }
+    	    			  if (buffer[l++] == 1){
+    	    			  	temperature_storage.AggMaxOn = 1;
+    	    			  }
+    	    			  if (buffer[l++] == 1){
+    	    			  	temperature_storage.AggMinOn = 1;
+    	    			  }
+    	    			  if (buffer[l++] == 1){
+    	    			    temperature_storage.AggCountOn = 1;
+    	    			  }
+    	    			  if (buffer[l++] == 1){
+    	    			    temperature_storage.AggSumOn = 1;
+    	    			  }
+    	    			  if (buffer[l++] == 1){
+    	    			    temperature_storage.AggSqSumOn = 1;
     	    			  }
 
-    	    			  // END AGGREGATOR
+     	    			  // END AGGREGATOR
 
     	    			  // START EPOCH DURATION
 
-    	    			  epDur = (uint8_t)atoi(nx_json_get(item, "epDur")->text_value);
+    	    			  epDur = (uint8_t)((buffer[l++] << 8) | buffer[l++]);
 
     	    			  APP_LOG(TS_ON, VLEVEL_L, "REPORTING PERIOD: %d [s]\r\n", epDur);
     	    			  temperature_storage.epDuration = epDur;
@@ -606,30 +589,30 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  // START CONDITION
 
-    	    			  if (nx_json_get(item, "cond")) {
-    	    				condSel = nx_json_get(nx_json_get(item, "cond"), "chain");
-    	    				condArr = nx_json_get(nx_json_get(item, "cond"), "agg");
+    	    			  // condition chain
 
-    	    				if ((uint8_t)atoi(condSel->text_value) == AND) {
-    	    			    	temperature_storage.condSel = AND;
-    	    				}
-    	    				if ((uint8_t)atoi(condSel->text_value) == OR) {
-    	    				    temperature_storage.condSel = OR;
-    	    				}
+    	    			  switch(buffer[l++])
+    	    			  {
+    	    			  	  case AND:
+    	    				  	  temperature_storage.condSel = AND;
+    	    	    			   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: AND\r\n");
+    	    				  	  break;
+    	    			  	  case OR:
+    	    			      	  temperature_storage.condSel = OR;
+    	    	    			   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: OR\r\n");
+    	    			      	  break;
+    	    			  	  default:
+    	    			  		  break;
+    	    			  }
 
+    	    			  temperature_storage.condSize = buffer[l++];
+
+    	    			  if (temperature_storage.condSize != 0) {
     	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
 
-    	    			    for (j = 0; j < condArr->children.length; j++) {
-    	    			    	const nx_json* condItem=nx_json_item(condArr, j);
-    	    			    	condVal = nx_json_get(condItem, "val");
-    	    			    	condExp = nx_json_get(condItem, "code");
-    	    			    	condPar = nx_json_get(condItem, "par");
-
-    	    			    	temperature_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
-
-    	    			    	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", temperature_storage.aggConditions[j].value);
-
-    	    			      	switch ((uint8_t)atoi(condPar->text_value))
+    	    			    for (j = 0; j < temperature_storage.condSize; j++) {
+    	    			    	// condition parameter
+    	    			      	switch (buffer[l++])
     	    			      	{
     	    			      		case TEMPERATURE:
     	    			      	    	APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
@@ -647,25 +630,33 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			      	       break;
     	    			      	}
 
-    	    			    	if (strcmp((char*)(condExp->text_value), "G") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
-    	    			    		temperature_storage.aggConditions[j].condition = GREATER;
-    	    			    	}
-    	    			    	else if (strcmp((char*)(condExp->text_value), "GE") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
-    	    			    		temperature_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
-    	    			    	}
-    	    			    	else if (strcmp((char*)(condExp->text_value), "L") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
-    	    			    		temperature_storage.aggConditions[j].condition = LESS;
-    	    			    	}
-    	    			    	else if (strcmp((char*)(condExp->text_value), "LE") == 0) {
-    	    			    		APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
-    	    			    		temperature_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
-    	    			    	}
-    	    			    	temperature_storage.condSize++;
-    	    			    }
+    	    			      	// condition type
 
+    	    			    	switch (buffer[l++])
+    	    			    	{
+    	    			    		case GREATER:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
+										temperature_storage.aggConditions[j].condition = GREATER;
+										break;
+    	    			    		case GREATER_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
+										temperature_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
+										break;
+    	    			    		case LESS:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
+										temperature_storage.aggConditions[j].condition = LESS;
+										break;
+    	    			    		case LESS_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
+										temperature_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
+										break;
+    	    			    		default:
+    	    			    			break;
+    	    			    	}
+
+								temperature_storage.aggConditions[j].value = (uint16_t)((buffer[l++] << 8) | buffer[l++]);
+    	    			    	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", temperature_storage.aggConditions[j].value);
+    	    			    }
     	    			  }
 
     	    			  // END CONDITION
@@ -686,38 +677,29 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  pressure_storage.condSize = 0;
     	    			  pressure_storage.measurementId = 0;
 
-    	    			  aggPar = nx_json_get(item, "agg");
-
     	    			  // START AGGREGATOR
-    	    			  for (j = 0; j < aggPar->children.length; j++) {
-    	    			  	const nx_json* item=nx_json_item(aggPar, j);
-    	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING AGGREGATOR: %s\r\n", item->text_value);
 
-    	    			    if (strcmp((char*)(item->text_value), "MAX") == 0){
-    	    			    	pressure_storage.AggMaxOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "MIN") == 0){
-    	    			      	pressure_storage.AggMinOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "COUNT") == 0) {
-    	    			      	pressure_storage.AggCountOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "AVG") == 0) {
-    	    			      	pressure_storage.AggAvgOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "SUM") == 0) {
-    	    			      	pressure_storage.AggSumOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "SQSUM") == 0) {
-    	    			      	pressure_storage.AggSqSumOn = 1;
-    	    			    }
-    	    			  }
+						  if (buffer[l++] == 1){
+							  pressure_storage.AggMaxOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  pressure_storage.AggMinOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  pressure_storage.AggCountOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  pressure_storage.AggSumOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  pressure_storage.AggSqSumOn = 1;
+						  }
 
-    	    			  // END AGGREGATOR
+						  // END AGGREGATOR
 
     	    			  // START EPOCH DURATION
 
-    	    			  epDur = (uint8_t)atoi(nx_json_get(item, "epDur")->text_value);
+						  epDur = (uint8_t)((buffer[l++] << 8) | buffer[l++]);
 
     	    			  APP_LOG(TS_ON, VLEVEL_L, "REPORTING PERIOD: %d [s]\r\n", epDur);
     	    			  pressure_storage.epDuration = epDur;
@@ -730,73 +712,77 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  // END EPOCH DURATION
 
-    	    			  // START CONDITION
+    	    			  // condition chain
 
-    	    			  if (nx_json_get(item, "cond")) {
-    	    			  	condSel = nx_json_get(nx_json_get(item, "cond"), "chain");
-    	    			    condArr = nx_json_get(nx_json_get(item, "cond"), "agg");
+						  switch(buffer[l++])
+						  {
+							  case AND:
+								  pressure_storage.condSel = AND;
+								   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: AND\r\n");
+								  break;
+							  case OR:
+								  pressure_storage.condSel = OR;
+								   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: OR\r\n");
+								  break;
+							  default:
+								  break;
+						  }
 
-    	    			    if (strcmp((char*)(condSel->text_value), "AND") == 0) {
-    	    			    	pressure_storage.condSel = AND;
-    	    			    }
-    	    			    if (strcmp((char*)(condSel->text_value), "OR") == 0) {
-    	    			    	pressure_storage.condSel = OR;
-    	    			    }
+						  pressure_storage.condSize = buffer[l++];
 
-    	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
+						  if (pressure_storage.condSize != 0) {
+							APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
 
-    	    			    for (j = 0; j < condArr->children.length; j++) {
-    	    			    	const nx_json* condItem=nx_json_item(condArr, j);
-    	    			      	condVal = nx_json_get(condItem, "val");
-    	    			      	condExp = nx_json_get(condItem, "code");
-    	    			      	condPar = nx_json_get(condItem, "par");
+							for (j = 0; j < pressure_storage.condSize; j++) {
+								// condition parameter
+								switch (buffer[l++])
+								{
+									case TEMPERATURE:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
+										pressure_storage.aggConditions[j].parameter = TEMPERATURE;
+										break;
+									case PRESSURE:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
+										pressure_storage.aggConditions[j].parameter = PRESSURE;
+										break;
+									case HUMIDITY:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
+										pressure_storage.aggConditions[j].parameter = HUMIDITY;
+										break;
+									default:
+									   break;
+								}
 
-    	    			      	pressure_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
+								// condition type
 
-    	    			      	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", pressure_storage.aggConditions[j].value);
+								switch (buffer[l++])
+								{
+									case GREATER:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
+										pressure_storage.aggConditions[j].condition = GREATER;
+										break;
+									case GREATER_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
+										pressure_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
+										break;
+									case LESS:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
+										pressure_storage.aggConditions[j].condition = LESS;
+										break;
+									case LESS_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
+										pressure_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
+										break;
+									default:
+										break;
+								}
 
-    	    			      	switch ((uint8_t)atoi(condPar->text_value))
-    	    			      	{
-    	    			      		case TEMPERATURE:
-    	    			      	    	APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
-    	    			      	    	pressure_storage.aggConditions[j].parameter = TEMPERATURE;
-    	    			      	    	break;
-    	    			      	    case PRESSURE:
-    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
-    	    			      	        pressure_storage.aggConditions[j].parameter = PRESSURE;
-    	    			      	        break;
-    	    			      	    case HUMIDITY:
-    	    			      	        APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
-    	    			      	        pressure_storage.aggConditions[j].parameter = HUMIDITY;
-    	    			      	        break;
-    	    			      	    default:
-    	    			      	       break;
-    	    			      	}
+								pressure_storage.aggConditions[j].value = (uint16_t)((buffer[l++] << 8) | buffer[l++]);
+								APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", pressure_storage.aggConditions[j].value);
+							}
+						  }
 
-    	    			      	if (strcmp((char*)(condExp->text_value), "G") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
-    	    			      	    pressure_storage.aggConditions[j].condition = GREATER;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condExp->text_value), "GE") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
-    	    			      	    pressure_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
-    	    			      	 }
-    	    			      	 else if (strcmp((char*)(condExp->text_value), "L") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
-    	    			      	    pressure_storage.aggConditions[j].condition = LESS;
-    	    			      	 }
-    	    			      	 else if (strcmp((char*)(condExp->text_value), "LE") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
-    	    			      	    pressure_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
-    	    			      	 }
-
-   	    			      	     pressure_storage.condSize++;
-
-    	    			      }
-
-    	    			  }
-
-    	    			  // END CONDITION
+						  // END CONDITION
 
     	    			  pressure_storage.AggStateOn = 1;
     			  		  break;
@@ -813,38 +799,29 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  humidity_storage.condSize = 0;
     	    			  humidity_storage.measurementId = 0;
 
-    	    			  aggPar = nx_json_get(item, "agg");
-
     	    			  // START AGGREGATOR
-    	    			  for (j = 0; j < aggPar->children.length; j++) {
-    	    			  	const nx_json* item=nx_json_item(aggPar, j);
-    	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING AGGREGATOR: %s\r\n", item->text_value);
 
-    	    			    if (strcmp((char*)(item->text_value), "MAX") == 0){
-    	    			    	humidity_storage.AggMaxOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "MIN") == 0){
-    	    			    	humidity_storage.AggMinOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "COUNT") == 0) {
-    	    			    	humidity_storage.AggCountOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "AVG") == 0) {
-    	    			    	humidity_storage.AggAvgOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "SUM") == 0) {
-    	    			    	humidity_storage.AggSumOn = 1;
-    	    			    }
-    	    			    if (strcmp((char*)(item->text_value), "SQSUM") == 0) {
-    	    			    	humidity_storage.AggSqSumOn = 1;
-    	    			    }
-    	    			  }
+						  if (buffer[l++] == 1){
+							  humidity_storage.AggMaxOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  humidity_storage.AggMinOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  humidity_storage.AggCountOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  humidity_storage.AggSumOn = 1;
+						  }
+						  if (buffer[l++] == 1){
+							  humidity_storage.AggSqSumOn = 1;
+						  }
 
-    	    			  // END AGGREGATOR
+						  // END AGGREGATOR
 
     	    			  // START EPOCH DURATION
 
-    	    			  epDur = (uint8_t)atoi(nx_json_get(item, "epDur")->text_value);
+    	    			  epDur = (uint8_t)((buffer[l++] << 8) | buffer[l++]);
 
     	    			  APP_LOG(TS_ON, VLEVEL_L, "REPORTING PERIOD: %d [s]\r\n", epDur);
     	    			  humidity_storage.epDuration = epDur;
@@ -859,84 +836,88 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  // START CONDITION
 
-    	    			  if (nx_json_get(item, "cond")) {
-    	    			  	condSel = nx_json_get(nx_json_get(item, "cond"), "chain");
-    	    			    condArr = nx_json_get(nx_json_get(item, "cond"), "agg");
+						  // condition chain
 
-    	    			    if (strcmp((char*)(condSel->text_value), "AND") == 0) {
-    	    			    	humidity_storage.condSel = AND;
-    	    			    }
-    	    			    if (strcmp((char*)(condSel->text_value), "OR") == 0) {
-    	    			    	humidity_storage.condSel = OR;
-    	    			    }
+						  switch(buffer[l++])
+						  {
+							  case AND:
+								  humidity_storage.condSel = AND;
+								   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: AND\r\n");
+								  break;
+							  case OR:
+								  humidity_storage.condSel = OR;
+								   APP_LOG(TS_ON, VLEVEL_L, "CONDITION CHAIN: OR\r\n");
+								  break;
+							  default:
+								  break;
+						  }
 
-    	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
+						  humidity_storage.condSize = buffer[l++];
 
-    	    			    for (j = 0; j < condArr->children.length; j++) {
-    	    			    	const nx_json* condItem=nx_json_item(condArr, j);
-    	    			      	condVal = nx_json_get(condItem, "val");
-    	    			      	condExp = nx_json_get(condItem, "code");
-    	    			      	condPar = nx_json_get(condItem, "par");
+						  if (humidity_storage.condSize != 0) {
+							APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
 
-    	    			      	humidity_storage.aggConditions[j].value = (uint16_t)atoi(condVal->text_value);
+							for (j = 0; j < temperature_storage.condSize; j++) {
+								// condition humidity_storage
+								switch (buffer[l++])
+								{
+									case TEMPERATURE:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
+										humidity_storage.aggConditions[j].parameter = TEMPERATURE;
+										break;
+									case PRESSURE:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
+										humidity_storage.aggConditions[j].parameter = PRESSURE;
+										break;
+									case HUMIDITY:
+										APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
+										humidity_storage.aggConditions[j].parameter = HUMIDITY;
+										break;
+									default:
+									   break;
+								}
 
-    	    			      	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", humidity_storage.aggConditions[j].value);
+								// condition type
 
-    	    			      	switch ((uint8_t)atoi(condPar->text_value))
-    	    			      	{
-    	    			      		case TEMPERATURE:
-    	    			      			APP_LOG(TS_ON, VLEVEL_L, "parameter: temperature\r\n");
-    	    			      			humidity_storage.aggConditions[j].parameter = TEMPERATURE;
-    	    			      			break;
-    	    			      		case PRESSURE:
-        	    			      		APP_LOG(TS_ON, VLEVEL_L, "parameter: pressure\r\n");
-        	    			      		humidity_storage.aggConditions[j].parameter = PRESSURE;
-        	    			      		break;
-    	    			      		case HUMIDITY:
-        	    			      	    APP_LOG(TS_ON, VLEVEL_L, "parameter: humidity\r\n");
-        	    			      	    humidity_storage.aggConditions[j].parameter = HUMIDITY;
-        	    			      	    break;
-        	    			      	default:
-        	    			      		break;
-    	    			      	}
+								switch (buffer[l++])
+								{
+									case GREATER:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
+										humidity_storage.aggConditions[j].condition = GREATER;
+										break;
+									case GREATER_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
+										humidity_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
+										break;
+									case LESS:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
+										humidity_storage.aggConditions[j].condition = LESS;
+										break;
+									case LESS_THAN_EQUAL:
+										APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
+										humidity_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
+										break;
+									default:
+										break;
+								}
 
-    	    			      	if (strcmp((char*)(condExp->text_value), "G") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: GREATER\r\n");
-    	    			      	    humidity_storage.aggConditions[j].condition = GREATER;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condExp->text_value), "GE") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: GREATER_THAN_EQUAL\r\n");
-    	    			      	    humidity_storage.aggConditions[j].condition = GREATER_THAN_EQUAL;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condExp->text_value), "L") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS\r\n");
-    	    			      	    humidity_storage.aggConditions[j].condition = LESS;
-    	    			      	}
-    	    			      	else if (strcmp((char*)(condExp->text_value), "LE") == 0) {
-    	    			      	    APP_LOG(TS_ON, VLEVEL_L, "code: LESS_THAN_EQUAL\r\n");
-    	    			      	    humidity_storage.aggConditions[j].condition = LESS_THAN_EQUAL;
-    	    			      	}
+								humidity_storage.aggConditions[j].value = (uint16_t)((buffer[l++] << 8) | buffer[l++]);
+								APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", humidity_storage.aggConditions[j].value);
+							}
+						  }
 
-        	    			    humidity_storage.condSize++;
-    	    			      }
+						  // END CONDITION
 
-    	    			  }
-
-    	    			  humidity_storage.AggStateOn = 1;
-    			  		  break;
-    			  	  default:
+						  humidity_storage.AggStateOn = 1;
     			  		  break;
     			  }
     		  }
-
-    		  // END CONDITION
     	      status = 1;
 
       	      APP_LOG(TS_ON, VLEVEL_L, "DATA PARSED CORRECTLY\r\n", (AppLedStateOn));
-
-    	      nx_json_free(rulesArray);
     	  }
-    	  else {
+    	  else
+    	  {
     		  status = 0;
           	  APP_LOG(TS_ON, VLEVEL_L, "ERROR WHILE PARSING DATA\r\n", (AppLedStateOn));
     	  }
@@ -985,8 +966,8 @@ static void CollectMeasurements(void)
 		APP_LOG(TS_OFF, VLEVEL_L, "\r\n###### ============ COLLECTING MEASUREMENS ============\r\n");
 		EnvSensors_Read(&sensor_data);
 		temperature = (SYS_GetTemperatureLevel() >> 8);
-		pressure    = (uint16_t)(sensor_data.pressure * 100 / 10);  /* in hPa / 10 */
-		humidity    = (uint16_t)(sensor_data.humidity * 10);            /* in %*10     */
+		pressure    = (uint16_t)(sensor_data.pressure);  /* in hPa */
+		humidity    = (uint16_t)(sensor_data.humidity);            /* in %    */
 		APP_LOG(TS_ON, VLEVEL_L, "pressure before condition: %d\r\n", (pressure));
 		APP_LOG(TS_ON, VLEVEL_L, "temperature before condition: %d\r\n", (temperature));
 		APP_LOG(TS_ON, VLEVEL_L, "humidity before condition: %d\r\n", (humidity));
@@ -1661,8 +1642,8 @@ static void SendTxData(void)
   EnvSensors_Read(&sensor_data);
 
   uint16_t temperature = (SYS_GetTemperatureLevel() >> 8);
-  uint16_t pressure    = (uint16_t)(sensor_data.pressure * 100 / 10);      /* in hPa / 10 */
-  uint16_t humidity    = (uint16_t)(sensor_data.humidity * 10);
+  uint16_t pressure    = (uint16_t)(sensor_data.pressure);      /* in hPa / 10 */
+  uint16_t humidity    = (uint16_t)(sensor_data.humidity);
 
   if (HumDataOn == 0 && TempDataOn == 0 && PressDataOn == 0) {
 

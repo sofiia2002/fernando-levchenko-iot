@@ -109,56 +109,54 @@ router.post("/add-rule", async (req, res) => {
     newData.push({});
     newData[index].par =
       element.parameter === "temperature"
-        ? "0"
+        ? 0
         : element.parameter === "pressure"
-        ? "1"
-        : "2";
-    if (element.conditions.agg.length !== 0)
-      newData[index].cond = {
-        agg: element.conditions.agg.map((cond) => {
-          return {
-            par:
-              cond.parameter === "temperature"
-                ? "0"
-                : cond.parameter === "pressure"
-                ? "1"
-                : "2",
-            val: cond.value,
-            code: cond.conditionCode,
-          };
-        }),
-        chain: element.conditions.chain === "AND" ? "1" : "0",
-      };
-    if (element.aggregators.length !== 0)
-      newData[index].agg = [
-        ...new Set(
-          element.aggregators
-            .map((agg) =>
-              agg === "VAR"
-                ? ["COUNT", "SQSUM", "SUM"]
-                : agg === "VAR"
-                ? ["COUNT", "SUM"]
-                : agg
-            )
-            .flat(1)
-        ),
-      ];
+        ? 1
+        : 2;
+    newData[index].cond = {
+      agg: element.conditions.agg.map((cond) => {
+        return {
+          par:
+            cond.parameter === "temperature"
+              ? 0
+              : cond.parameter === "pressure"
+              ? 1
+              : 2,
+          val: parseInt(cond.value),
+          code: cond.conditionCode,
+        };
+      }),
+      chain: element.conditions.chain === "AND" ? 1 : 0,
+    };
+    newData[index].agg = [
+      ...new Set(
+        element.aggregators
+          .map((agg) =>
+            agg === "VAR"
+              ? ["COUNT", "SQSUM", "SUM"]
+              : agg === "VAR"
+              ? ["COUNT", "SUM"]
+              : agg
+          )
+          .flat(1)
+      ),
+    ];
     if (active_aggregators[element.parameter])
       active_aggregators = {
         ...active_aggregators,
         [element.parameter]: [...element.aggregators],
       };
     else active_aggregators[element.parameter] = [...element.aggregators];
-    newData[index].epDur = element.epochDuration;
+    newData[index].epDur = parseInt(element.epochDuration);
   });
 
-  const s = JSON.stringify(newData);
-  console.log(s);
+  const result = helpers.convert_message(newData);
+  console.log(result);
 
   try {
     await axios.post(
       "http://localhost:1880/send-rule",
-      Buffer.from(s).toString("base64"),
+      result.toString("base64"),
       {
         headers: {
           "Content-Type": "text/plain",
