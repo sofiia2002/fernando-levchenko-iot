@@ -13,6 +13,8 @@ const num_of_devices = 1;
 
 var active_aggregators = {};
 var saved_messages = [];
+var messages_to_be_send_to_frontend = [];
+var last_idx = -1;
 var processed_mess_ids = [-1];
 
 var corsOptions = {
@@ -29,12 +31,47 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
+router.get("/get-messages", function (req, res, next) {
+  console.log("request");
+  res.send(messages_to_be_send_to_frontend);
+  last_idx =
+    messages_to_be_send_to_frontend.length > 0
+      ? messages_to_be_send_to_frontend[
+          messages_to_be_send_to_frontend.length - 1
+        ].id
+      : last_idx;
+  messages_to_be_send_to_frontend = [];
+});
+
 router.post("/post-uplink-message", async (req, res) => {
   const data = req.body.uplink_message.decoded_payload;
   console.log(data);
 
+  var message = {
+    id:
+      messages_to_be_send_to_frontend.length > 0
+        ? messages_to_be_send_to_frontend[
+            messages_to_be_send_to_frontend.length - 1
+          ].id + 1
+        : last_idx + 1,
+    type: "uplink",
+    timestamp: req.body.received_at,
+    entityId: req.body.end_device_ids.device_id,
+    messDesc: "Forward uplink data message",
+    dataPreview: {
+      payload: "",
+      fPort: req.body.uplink_message.f_port,
+      dataRate: "SF7BW125",
+      snr: req.body.uplink_message.rx_metadata[0].snr,
+      rssi: req.body.uplink_message.rx_metadata[0].rssi,
+    },
+  };
+
   if (data) {
     var sendData = {};
+
+    message.dataPreview.payload = JSON.stringify(data);
+    messages_to_be_send_to_frontend.push(message);
 
     console.log(data.AggState);
 
@@ -44,13 +81,12 @@ router.post("/post-uplink-message", async (req, res) => {
     }
 
     if (data.AggState === 1) {
-      console.log("#1");
       saved_messages.push(data);
+
       console.log("processed_mess_ids", JSON.stringify(processed_mess_ids));
       console.log("saved_messages", JSON.stringify(saved_messages));
 
       if (data.measurementId - 1 > Math.max(...processed_mess_ids)) {
-        console.log("#2");
         const exclusive_mess_for_parameter_and_id = saved_messages.filter(
           (mess) => mess.measurementId === Math.max(...processed_mess_ids) + 1
         );
@@ -60,7 +96,6 @@ router.post("/post-uplink-message", async (req, res) => {
         );
 
         if (exclusive_mess_for_parameter_and_id.length > 0) {
-          console.log("#3");
           sendData.data = helpers.process_messages(
             num_of_devices,
             active_aggregators,
@@ -76,30 +111,48 @@ router.post("/post-uplink-message", async (req, res) => {
 
           console.log("sendData", JSON.stringify(sendData));
 
-          const s = JSON.stringify(sendData);
-
-          try {
-            await axios.post(
-              "http://localhost:1880/send-agg-result",
-              Buffer.from(s).toString("base64"),
-              {
-                headers: {
-                  "Content-Type": "text/plain",
-                },
-              }
-            );
-          } catch (err) {
-            console.log(err);
-          }
+          message.type = "result";
+          message.entityId = "Backend application";
+          message.messDesc = "Aggregation result";
+          message.dataPreview.fPort = null;
+          message.dataPreview.dataRate = null;
+          message.dataPreview.rssi = null;
+          message.dataPreview.snr = null;
+          message.dataPreview.payload = JSON.stringify(sendData);
+          messages_to_be_send_to_frontend.push(message);
         }
       }
     }
   }
+  console.log(messages_to_be_send_to_frontend);
 });
 
 router.post("/add-rule", async (req, res) => {
   console.log(req.body);
   var newData = [];
+
+  var message = {
+    id:
+      messages_to_be_send_to_frontend.length > 0
+        ? messages_to_be_send_to_frontend[
+            messages_to_be_send_to_frontend.length - 1
+          ].id +
+          (last_idx > -1 ? last_idx : 0) +
+          1
+        : last_idx + 1,
+    type: "downlink",
+    timestamp: new Date().toISOString(),
+    entityId: "All devices",
+    messDesc: "Send aggregation message",
+    dataPreview: {
+      payload: JSON.stringify(req.body),
+      fPort: null,
+      dataRate: null,
+      snr: null,
+      rssi: null,
+    },
+  };
+  messages_to_be_send_to_frontend.push(message);
 
   active_aggregators = {};
   saved_messages = [];

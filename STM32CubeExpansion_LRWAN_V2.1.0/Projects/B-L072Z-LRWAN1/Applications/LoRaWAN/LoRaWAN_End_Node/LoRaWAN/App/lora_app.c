@@ -40,10 +40,9 @@
 
 /* USER CODE BEGIN Includes */
 
-#include <nxjson.h>
-#include <agg_types.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* USER CODE END Includes */
 
@@ -476,6 +475,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 	uint8_t i = 0;
 	uint8_t j = 0;
 	UTIL_TIMER_Time_t nextTxIn = 0;
+	time_t start,end;
 
     switch (appData->Port)
     {
@@ -540,6 +540,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     			  switch (buffer[l++])
     			  {
     			  	  case TEMPERATURE:
+    	    			  APP_LOG(TS_ON, VLEVEL_L, "READING PARAMETER\r\n");
     	    			  APP_LOG(TS_ON, VLEVEL_L, "ENABLING PARAMETER: TEMPERATURE\r\n");
     	    			  TempDataOn = 1;
 
@@ -554,6 +555,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     	    			  // START AGGREGATOR
 
+    	    			  APP_LOG(TS_ON, VLEVEL_L, "READING AGG FUNCTION\r\n");
     	    			  if (buffer[l++] == 1){
     	    			  	temperature_storage.AggMaxOn = 1;
     	    			  }
@@ -569,6 +571,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  if (buffer[l++] == 1){
     	    			    temperature_storage.AggSqSumOn = 1;
     	    			  }
+
+    	    			  APP_LOG(TS_ON, VLEVEL_L, "END READING AGG FUNCTION\r\n");
 
      	    			  // END AGGREGATOR
 
@@ -611,6 +615,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			    APP_LOG(TS_ON, VLEVEL_L, "ENABLING CONDITION:\r\n");
 
     	    			    for (j = 0; j < temperature_storage.condSize; j++) {
+    	    	    			APP_LOG(TS_ON, VLEVEL_L, "READING CONDITION\r\n");
     	    			    	// condition parameter
     	    			      	switch (buffer[l++])
     	    			      	{
@@ -656,12 +661,14 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
 								temperature_storage.aggConditions[j].value = (uint16_t)((buffer[l++] << 8) | buffer[l++]);
     	    			    	APP_LOG(TS_ON, VLEVEL_L, "value: %d\r\n", temperature_storage.aggConditions[j].value);
+    	    	    			APP_LOG(TS_ON, VLEVEL_L, "END READING CONDITION\r\n");
     	    			    }
     	    			  }
 
     	    			  // END CONDITION
 
     	    			  temperature_storage.AggStateOn = 1;
+    	    			  APP_LOG(TS_ON, VLEVEL_L, "END READING PARAMETER: \r\n");
 
     			  		  break;
     			  	  case PRESSURE:
@@ -921,7 +928,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     		  status = 0;
           	  APP_LOG(TS_ON, VLEVEL_L, "ERROR WHILE PARSING DATA\r\n", (AppLedStateOn));
     	  }
-
+  		  start = clock();
     	  // Sending "Success" message via uplink
     	  AppData.Port = LORAWAN_USER_APP_PORT;
     	  AppData.Buffer[i++] = (uint8_t)(status & 0xFF);
@@ -930,7 +937,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	  if (LORAMAC_HANDLER_SUCCESS == LmHandlerSend(&AppData, LORAWAN_DEFAULT_CONFIRMED_MSG_STATE, &nextTxIn, false))
     	  {
     	  	APP_LOG(TS_ON, VLEVEL_L, "%d\r\n", (AppData.Buffer));
-    	    APP_LOG(TS_ON, VLEVEL_L, "SEND REQUEST\r\n");
+    		end = clock();
+    	    APP_LOG(TS_ON, VLEVEL_L, "SEND REQUEST %d\r\n", (end-start)/CLOCKS_PER_SEC);
     	  }
 
     	  break;
@@ -973,6 +981,7 @@ static void CollectMeasurements(void)
 		APP_LOG(TS_ON, VLEVEL_L, "humidity before condition: %d\r\n", (humidity));
 
 		for (i = 0; i < temperature_storage.condSize; i++) {
+			APP_LOG(TS_ON, VLEVEL_L, "READING CONDTION INSIDE COLLECTING MEASUREMENTS\r\n");
 			switch (temperature_storage.aggConditions[i].condition){
 				case GREATER:
 					if (temperature_storage.aggConditions[i].parameter == TEMPERATURE) {
@@ -1043,6 +1052,7 @@ static void CollectMeasurements(void)
 					}
 					break;
 			}
+			APP_LOG(TS_ON, VLEVEL_L, "END READING CONDTION INSIDE COLLECTING MEASUREMENTS\r\n");
 		}
 
 		for (i = 0; i < pressure_storage.condSize; i++) {
@@ -1190,6 +1200,7 @@ static void CollectMeasurements(void)
 					break;
 			}
 		}
+		APP_LOG(TS_ON, VLEVEL_L, "DATA GATHERING\r\n");
 
 		if (TempDataOn == 1 && ((temperature_storage.condSel == AND && collectTemperature == temperature_storage.condSize) || (temperature_storage.condSel == OR && collectTemperature > 0) || (temperature_storage.condSize == 0)) )
 		{
@@ -1206,6 +1217,7 @@ static void CollectMeasurements(void)
 				temperature_storage.collectedData.max = temperature;
 			}
 		}
+		APP_LOG(TS_ON, VLEVEL_L, "END DATA GATHERING\r\n");
 
 		if (PressDataOn == 1 && ((pressure_storage.condSel == AND && collectPressure == pressure_storage.condSize) || (pressure_storage.condSel == OR && collectPressure > 0) || (pressure_storage.condSize == 0)))
 		{

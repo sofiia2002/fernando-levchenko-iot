@@ -80,4 +80,5 @@ cmwx1zzabz_0xx/exe/lora_app.o: ..\LoRaWAN\App\lora_app.c \
   ..\..\..\..\..\..\Middlewares\Third_Party\LoRaWAN\Mac\LoRaMacClassB.h \
   ..\..\..\..\..\..\Utilities\lpm\tiny_lpm\stm32_lpm.h \
   ..\Core\Inc\adc_if.h ..\Core\Inc\adc.h ..\LoRaWAN\App\CayenneLpp.h \
-  ..\Core\Inc\sys_sensors.h
+  ..\Core\Inc\sys_sensors.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdio.h

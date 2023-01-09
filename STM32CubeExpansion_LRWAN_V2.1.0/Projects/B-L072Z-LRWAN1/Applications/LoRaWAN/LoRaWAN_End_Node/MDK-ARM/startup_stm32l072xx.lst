@@ -368,10 +368,10 @@ Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M0+ --depend=cmw
 x1zzabz_0xx\exe\startup_stm32l072xx.d -ocmwx1zzabz_0xx\exe\startup_stm32l072xx.
 o -I.\RTE\_cmwx1zzabz_0xx -IC:\Users\sofia\AppData\Local\Arm\Packs\ARM\CMSIS\5.
 9.0\CMSIS\Core\Include -IC:\Users\sofia\AppData\Local\Arm\Packs\Keil\STM32L0xx_
-DFP\2.2.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include --predefine="__EVAL SETA 1"
- --predefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 537" --pre
-define="_RTE_ SETA 1" --predefine="STM32L072xx SETA 1" --predefine="_RTE_ SETA 
-1" --list=startup_stm32l072xx.lst startup_stm32l072xx.s
+DFP\2.2.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include --predefine="__MICROLIB SET
+A 1" --predefine="__UVISION_VERSION SETA 537" --predefine="_RTE_ SETA 1" --pred
+efine="STM32L072xx SETA 1" --predefine="_RTE_ SETA 1" --list=startup_stm32l072x
+x.lst startup_stm32l072xx.s
 
 
 
@@ -907,4 +907,4 @@ Symbol: __main
       At line 124 in file startup_stm32l072xx.s
 Comment: __main used once
 2 symbols
-390 symbols in table
+389 symbols in table
