@@ -36,8 +36,9 @@ const process_messages = (
 
 const process_variation = (messages) => {
   const average = process_avg(messages);
-  const variation =
-    process_sguareSum(messages) / process_count(messages) - average * average;
+  const variation = Math.sqrt(
+    process_sguareSum(messages) / process_count(messages) - average * average
+  );
 
   return { average, variation };
 };

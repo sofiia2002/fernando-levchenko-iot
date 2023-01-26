@@ -9,13 +9,13 @@ const router = express.Router();
 const app = express();
 const port = process.env["BACKEND_PORT"];
 
-const num_of_devices = 1;
+const num_of_devices = 3;
 
 var active_aggregators = {};
 var saved_messages = [];
 var messages_to_be_send_to_frontend = [];
 var last_idx = -1;
-var processed_mess_ids = [-1];
+var processed_mess_ids = [0];
 
 var corsOptions = {
   allowedHeaders: ["Content-Type"],
@@ -33,12 +33,13 @@ app.listen(port, () => {
 
 router.get("/get-messages", function (req, res, next) {
   console.log("request");
-  res.send(messages_to_be_send_to_frontend);
+  const filtered_data = messages_to_be_send_to_frontend.filter(
+    (v, i, a) => a.indexOf(v) === i
+  );
+  res.send(filtered_data);
   last_idx =
-    messages_to_be_send_to_frontend.length > 0
-      ? messages_to_be_send_to_frontend[
-          messages_to_be_send_to_frontend.length - 1
-        ].id
+    filtered_data.length > 0
+      ? filtered_data[filtered_data.length - 1].id
       : last_idx;
   messages_to_be_send_to_frontend = [];
 });
@@ -67,7 +68,7 @@ router.post("/post-uplink-message", async (req, res) => {
     },
   };
 
-  if (data) {
+  if (data && req.body.uplink_message.f_port) {
     var sendData = {};
 
     message.dataPreview.payload = JSON.stringify(data);
@@ -87,12 +88,24 @@ router.post("/post-uplink-message", async (req, res) => {
       console.log("saved_messages", JSON.stringify(saved_messages));
 
       if (data.measurementId - 1 > Math.max(...processed_mess_ids)) {
+        const first_low_id = saved_messages.findIndex(
+          (mess) => mess.measurementId > Math.max(...processed_mess_ids)
+        );
+
+        console.log("id", first_low_id);
+
         const exclusive_mess_for_parameter_and_id = saved_messages.filter(
-          (mess) => mess.measurementId === Math.max(...processed_mess_ids) + 1
+          (mess) =>
+            mess.measurementId === saved_messages[first_low_id].measurementId
         );
         console.log(
           "exclusive_mess_for_parameter_and_id",
           JSON.stringify(exclusive_mess_for_parameter_and_id)
+        );
+
+        console.log(
+          "exclusive_mess_for_parameter_and_id length",
+          exclusive_mess_for_parameter_and_id.length
         );
 
         if (exclusive_mess_for_parameter_and_id.length > 0) {
@@ -187,7 +200,7 @@ router.post("/add-rule", async (req, res) => {
           .map((agg) =>
             agg === "VAR"
               ? ["COUNT", "SQSUM", "SUM"]
-              : agg === "VAR"
+              : agg === "AVG"
               ? ["COUNT", "SUM"]
               : agg
           )

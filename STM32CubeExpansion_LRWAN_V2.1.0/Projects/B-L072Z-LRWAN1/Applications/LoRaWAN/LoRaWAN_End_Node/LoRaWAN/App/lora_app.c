@@ -72,14 +72,6 @@ typedef enum TxEventType_e
 
 /* USER CODE BEGIN PTD */
 
-typedef struct agg_value {
-	uint32_t sum;
-	uint32_t sqSum;
-	uint16_t count;
-	uint16_t min;
-	uint16_t max;
-} agg_value;
-
 typedef enum cond_type
 {
   GREATER,
@@ -113,27 +105,30 @@ typedef struct agg_condition {
 	agg_type condition;
 } agg_condition;
 
+
+typedef struct agg_value {
+	uint32_t sum;
+	uint32_t sqSum;
+	uint16_t count;
+	uint16_t min;
+	uint16_t max;
+} agg_value;
+
 typedef struct agg_storage {
 	uint8_t measurementId;
 	uint8_t AggStateOn;
 	uint8_t AggMaxOn;
 	uint8_t AggMinOn;
 	uint8_t AggCountOn;
-	uint8_t AggAvgOn;
 	uint8_t AggSumOn;
 	uint8_t AggSqSumOn;
 	uint8_t epDuration;
 	agg_value collectedData;
 	uint8_t condSize;
-	uint8_t condSel; // condition selector: "OR" or "AND"
+	// condition selector: "OR" or "AND"
+	uint8_t condSel;
 	agg_condition aggConditions[6];
 } agg_storage;
-
-typedef struct children { // children of OBJECT or ARRAY
-	int length;
-	struct nx_json *first;
-	struct nx_json *last;
-} children;
 
 /* USER CODE END PTD */
 
@@ -547,7 +542,6 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  temperature_storage.AggMaxOn = 0;
     	    			  temperature_storage.AggMinOn = 0;
     	    			  temperature_storage.AggCountOn = 0;
-    	    			  temperature_storage.AggAvgOn = 0;
     	    			  temperature_storage.AggSumOn = 0;
     	    			  temperature_storage.AggSqSumOn = 0;
     	    			  temperature_storage.condSize = 0;
@@ -678,7 +672,6 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  pressure_storage.AggMaxOn = 0;
     	    			  pressure_storage.AggMinOn = 0;
     	    			  pressure_storage.AggCountOn = 0;
-    	    			  pressure_storage.AggAvgOn = 0;
     	    			  pressure_storage.AggSumOn = 0;
     	    			  pressure_storage.AggSqSumOn = 0;
     	    			  pressure_storage.condSize = 0;
@@ -800,7 +793,6 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     	    			  humidity_storage.AggMaxOn = 0;
     	    			  humidity_storage.AggMinOn = 0;
     	    			  humidity_storage.AggCountOn = 0;
-    	    			  humidity_storage.AggAvgOn = 0;
     	    			  humidity_storage.AggSumOn = 0;
     	    			  humidity_storage.AggSqSumOn = 0;
     	    			  humidity_storage.condSize = 0;
@@ -990,7 +982,7 @@ static void CollectMeasurements(void)
 						}
 					}
 					else if (temperature_storage.aggConditions[i].parameter == PRESSURE) {
-						if (temperature  > temperature_storage.aggConditions[i].value) {
+						if (pressure > temperature_storage.aggConditions[i].value) {
 							collectTemperature++;
 						}
 					}
@@ -1259,7 +1251,6 @@ static void SendTemperatureMeasurements(void)
 {
 	int16_t temperature_max = 0;
 	int16_t temperature_min = 0;
-	int16_t temperature_avg = 0;
 	int16_t temperature_count = 0;
 	int16_t temperature_sum = 0;
 	uint32_t temperature_sqSum = 0;
@@ -1283,9 +1274,6 @@ static void SendTemperatureMeasurements(void)
    	    if (temperature_storage.AggMinOn == 1) {
 		   temperature_min = temperature_storage.collectedData.min;
 		}
-		if (temperature_storage.AggAvgOn == 1) {
-		   temperature_avg = temperature_storage.collectedData.sum / temperature_storage.collectedData.count;
-		}
 		if (temperature_storage.AggSumOn == 1) {
 		   temperature_sum = temperature_storage.collectedData.sum;
 		}
@@ -1303,24 +1291,22 @@ static void SendTemperatureMeasurements(void)
 		AppData.Buffer[i++] = temperature_storage.measurementId;
 		AppData.Buffer[i++] = temperature_storage.AggMaxOn;
 		AppData.Buffer[i++] = temperature_storage.AggMinOn;
-		AppData.Buffer[i++] = temperature_storage.AggAvgOn;
 		AppData.Buffer[i++] = temperature_storage.AggSumOn;
 		AppData.Buffer[i++] = temperature_storage.AggCountOn;
 		AppData.Buffer[i++] = temperature_storage.AggSqSumOn;
 
 		if (temperature_storage.AggMaxOn == 1) {
+			AppData.Buffer[i++] = (uint8_t)((temperature_max >> 8) & 0xFF);
 			AppData.Buffer[i++] = (uint8_t)(temperature_max & 0xFF);
 			APP_LOG(TS_ON, VLEVEL_L, "temperature max: %d\r\n", (temperature_max));
 		}
 		if (temperature_storage.AggMinOn == 1) {
+			AppData.Buffer[i++] = (uint8_t)((temperature_min >> 8) & 0xFF);
 			AppData.Buffer[i++] = (uint8_t)(temperature_min & 0xFF);
 			APP_LOG(TS_ON, VLEVEL_L, "temperature min: %d\r\n", (temperature_min));
 		}
-		if (temperature_storage.AggAvgOn == 1) {
-			AppData.Buffer[i++] = (uint8_t)(temperature_avg & 0xFF);
-			APP_LOG(TS_ON, VLEVEL_L, "temperature avg: %d\r\n", (temperature_avg));
-		}
 		if (temperature_storage.AggSumOn == 1) {
+			AppData.Buffer[i++] = (uint8_t)((temperature_sum >> 8) & 0xFF);
 			AppData.Buffer[i++] = (uint8_t)(temperature_sum & 0xFF);
 			APP_LOG(TS_ON, VLEVEL_L, "temperature sum: %d\r\n", (temperature_sum));
 		}
@@ -1386,7 +1372,6 @@ static void SendPressureMeasurements(void)
 	uint16_t pressure_min = 0;
 	uint16_t pressure_sum = 0;
 	uint32_t pressure_sqSum = 0;
-	uint16_t pressure_avg = 0;
 	int16_t pressure_count = 0;
 
 	sensor_t sensor_data;
@@ -1408,9 +1393,6 @@ static void SendPressureMeasurements(void)
 	   	if (pressure_storage.AggMinOn == 1) {
 	       	pressure_min = pressure_storage.collectedData.min;
 		}
-		if (pressure_storage.AggAvgOn == 1) {
-			pressure_avg = pressure_storage.collectedData.sum / pressure_storage.collectedData.count;
-		}
 		if (pressure_storage.AggSumOn == 1) {
 			pressure_sum = pressure_storage.collectedData.sum;
 		}
@@ -1428,7 +1410,6 @@ static void SendPressureMeasurements(void)
 		AppData.Buffer[i++] = pressure_storage.measurementId;
 		AppData.Buffer[i++] = pressure_storage.AggMaxOn;
 		AppData.Buffer[i++] = pressure_storage.AggMinOn;
-		AppData.Buffer[i++] = pressure_storage.AggAvgOn;
 		AppData.Buffer[i++] = pressure_storage.AggSumOn;
 		AppData.Buffer[i++] = pressure_storage.AggCountOn;
 		AppData.Buffer[i++] = pressure_storage.AggSqSumOn;
@@ -1442,11 +1423,6 @@ static void SendPressureMeasurements(void)
 			AppData.Buffer[i++] = (uint8_t)((pressure_min >> 8) & 0xFF);
 			AppData.Buffer[i++] = (uint8_t)(pressure_min & 0xFF);
 			APP_LOG(TS_ON, VLEVEL_L, "pressure min: %d\r\n", (pressure_min));
-		}
-		if (pressure_storage.AggAvgOn == 1) {
-			AppData.Buffer[i++] = (uint8_t)((pressure_avg >> 8) & 0xFF);
-			AppData.Buffer[i++] = (uint8_t)(pressure_avg & 0xFF);
-			APP_LOG(TS_ON, VLEVEL_L, "pressure avg: %d\r\n", (pressure_avg));
 		}
 		if (pressure_storage.AggSumOn == 1) {
 			AppData.Buffer[i++] = (uint8_t)((pressure_sum >> 8) & 0xFF);
@@ -1515,7 +1491,6 @@ static void SendHumidityMeasurements(void)
 	uint16_t humidity_min = 0;
 	uint16_t humidity_sum = 0;
 	uint32_t humidity_sqSum = 0;
-	uint16_t humidity_avg = 0;
 	int16_t humidity_count = 0;
 
 	sensor_t sensor_data;
@@ -1537,9 +1512,6 @@ static void SendHumidityMeasurements(void)
 	   	if (humidity_storage.AggMinOn == 1) {
 	   		humidity_min = humidity_storage.collectedData.min;
 		}
-		if (humidity_storage.AggAvgOn == 1) {
-			humidity_avg = humidity_storage.collectedData.sum / humidity_storage.collectedData.count;
-		}
 		if (humidity_storage.AggSumOn == 1) {
 			humidity_sum = humidity_storage.collectedData.sum;
 		}
@@ -1557,7 +1529,6 @@ static void SendHumidityMeasurements(void)
 		AppData.Buffer[i++] = humidity_storage.measurementId;
 		AppData.Buffer[i++] = humidity_storage.AggMaxOn;
 		AppData.Buffer[i++] = humidity_storage.AggMinOn;
-		AppData.Buffer[i++] = humidity_storage.AggAvgOn;
 		AppData.Buffer[i++] = humidity_storage.AggSumOn;
 		AppData.Buffer[i++] = humidity_storage.AggCountOn;
 		AppData.Buffer[i++] = humidity_storage.AggSqSumOn;
@@ -1571,11 +1542,6 @@ static void SendHumidityMeasurements(void)
 			AppData.Buffer[i++] = (uint8_t)((humidity_min >> 8) & 0xFF);
 			AppData.Buffer[i++] = (uint8_t)(humidity_min & 0xFF);
 			APP_LOG(TS_ON, VLEVEL_L, "humidity min: %d\r\n", (humidity_min));
-		}
-		if (humidity_storage.AggAvgOn == 1) {
-			AppData.Buffer[i++] = (uint8_t)((humidity_avg >> 8) & 0xFF);
-			AppData.Buffer[i++] = (uint8_t)(humidity_avg & 0xFF);
-			APP_LOG(TS_ON, VLEVEL_L, "humidity avg: %d\r\n", (humidity_avg));
 		}
 		if (humidity_storage.AggSumOn == 1) {
 			AppData.Buffer[i++] = (uint8_t)((humidity_sum >> 8) & 0xFF);
